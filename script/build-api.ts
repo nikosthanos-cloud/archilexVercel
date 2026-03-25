@@ -8,7 +8,7 @@ await build({
   platform: "node",
   bundle: true,
   format: "cjs",
-  outfile: path.join(root, "api/index.js"),
+  outfile: path.join(root, "api/index.cjs"),
   alias: {
     "@shared": path.join(root, "shared"),
   },
