@@ -23,16 +23,25 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 
 // Initialize routes once at module load
-const ready = registerRoutes(httpServer, app).then(() => {
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    if (res.headersSent) return next(err);
-    return res.status(status).json({ message });
+let startupError: Error | null = null;
+const ready = registerRoutes(httpServer, app)
+  .then(() => {
+    app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      if (res.headersSent) return next(err);
+      return res.status(status).json({ message });
+    });
+  })
+  .catch((err: Error) => {
+    startupError = err;
+    console.error("Server startup failed:", err.message);
   });
-});
 
 export default async function handler(req: Request, res: Response) {
   await ready;
+  if (startupError) {
+    return res.status(500).json({ message: `Server startup failed: ${startupError.message}` });
+  }
   return app(req, res);
 }
