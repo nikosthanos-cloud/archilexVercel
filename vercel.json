@@ -1,6 +1,7 @@
 {
   "version": 2,
   "framework": null,
+  "nodeVersion": "24.x",
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "dist/public",
   "functions": {
