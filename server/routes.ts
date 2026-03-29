@@ -521,12 +521,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Stripe Webhook (Raw body required)
-  app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), async (req, res) => {
+  app.post("/api/webhooks/stripe", async (req, res) => {
     const sig = req.headers["stripe-signature"] as string;
     let event;
 
     try {
-      event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
+      const rawBody = (req as any).rawBody as Buffer;
+      event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET!);
     } catch (err: any) {
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
