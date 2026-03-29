@@ -271,6 +271,11 @@ export default function Dashboard() {
                   ) : (
                     <p className="text-xs text-muted-foreground mb-3">Απεριόριστη πρόσβαση σε όλα τα εργαλεία</p>
                   )}
+                  {user?.subscriptionEndDate && user?.plan !== "free" && (
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Ανανέωση: <span className="font-semibold text-sidebar-foreground">{new Date(user.subscriptionEndDate).toLocaleDateString("el-GR", { day: "numeric", month: "short", year: "numeric" })}</span>
+                    </p>
+                  )}
                   {canUpgrade && (
                     <Button size="sm" className="w-full gap-1" onClick={() => setShowUpgradeDialog(true)} data-testid="button-upgrade">
                       <Crown className="w-3 h-3" />

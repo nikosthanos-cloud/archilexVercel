@@ -6,9 +6,10 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Save, User } from "lucide-react";
+import { Loader2, Save, User, Crown, Calendar } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -189,6 +190,35 @@ export default function ProfileSettings() {
               />
             </CardContent>
           </Card>
+
+          {user?.plan && user.plan !== "free" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Crown className="w-4 h-4 text-primary" />
+                  Συνδρομή
+                </CardTitle>
+                <CardDescription>Πληροφορίες για την ενεργή σας συνδρομή.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Ενεργό Πλάνο</span>
+                  <Badge variant="default" className="capitalize">{user.plan}</Badge>
+                </div>
+                {user.subscriptionEndDate && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Επόμενη Ανανέωση
+                    </span>
+                    <span className="text-sm font-medium">
+                      {new Date(user.subscriptionEndDate).toLocaleDateString("el-GR", { day: "numeric", month: "long", year: "numeric" })}
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex justify-end">
             <Button type="submit" disabled={saveMutation.isPending} className="gap-2" data-testid="button-save-profile">
