@@ -540,7 +540,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const amount = session.amount_total;
 
       if (userId && plan) {
-        await storage.updateUserSubscription(userId, customerId, subscriptionId, plan);
+        let subscriptionEndDate: Date | undefined;
+        if (subscriptionId) {
+          try {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            subscriptionEndDate = new Date((subscription as any).current_period_end * 1000);
+          } catch (e) {
+            console.error("Failed to retrieve subscription details:", e);
+          }
+        }
+        await storage.updateUserSubscription(userId, customerId, subscriptionId, plan, subscriptionEndDate);
 
         // Save payment to DB
         await storage.createPayment({

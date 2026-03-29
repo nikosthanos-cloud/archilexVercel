@@ -21,7 +21,7 @@ export interface IStorage {
   getUserByStripeCustomerId(customerId: string): Promise<User | undefined>;
   createUser(user: InsertUser & { password: string, emailVerificationToken?: string }): Promise<User>;
   updateUserPlan(id: string, plan: string, stripeSubscriptionId?: string): Promise<User>;
-  updateUserSubscription(id: string, stripeCustomerId: string, stripeSubscriptionId: string, plan: string): Promise<User>;
+  updateUserSubscription(id: string, stripeCustomerId: string, stripeSubscriptionId: string, plan: string, subscriptionEndDate?: Date): Promise<User>;
   updateUserProfile(id: string, data: UpdateProfile): Promise<User>;
   updateLastLogin(id: string): Promise<void>;
   updatePassword(id: string, passwordHashed: string): Promise<void>;
@@ -79,9 +79,9 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async updateUserSubscription(id: string, stripeCustomerId: string, stripeSubscriptionId: string, plan: string): Promise<User> {
+  async updateUserSubscription(id: string, stripeCustomerId: string, stripeSubscriptionId: string, plan: string, subscriptionEndDate?: Date): Promise<User> {
     const result = await db.update(users)
-      .set({ stripeCustomerId, stripeSubscriptionId, plan })
+      .set({ stripeCustomerId, stripeSubscriptionId, plan, ...(subscriptionEndDate ? { subscriptionEndDate } : {}) })
       .where(eq(users.id, id))
       .returning();
     return result[0];
