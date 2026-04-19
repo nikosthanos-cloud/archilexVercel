@@ -315,8 +315,18 @@ var DatabaseStorage = class {
     return result[0];
   }
   async createQuestion(userId, question, answer, citations = null) {
-    const result = await db.insert(questions).values({ userId, question, answer, citations: citations ?? void 0 }).returning();
-    return result[0];
+    try {
+      const result = await db.insert(questions).values({ userId, question, answer, citations: citations ?? void 0 }).returning();
+      return result[0];
+    } catch (err) {
+      const msg = String(err?.message ?? err);
+      if (msg.includes("citations") && /does not exist|undefined column/i.test(msg)) {
+        console.warn("[storage] questions.citations column missing \u2014 falling back to legacy insert. Run `npm run db:push` to migrate.");
+        const result = await db.insert(questions).values({ userId, question, answer }).returning();
+        return result[0];
+      }
+      throw err;
+    }
   }
   async getUserQuestions(userId) {
     return await db.select().from(questions).where((0, import_drizzle_orm2.eq)(questions.userId, userId)).orderBy((0, import_drizzle_orm2.desc)(questions.createdAt));
@@ -414,7 +424,13 @@ function extractCitationKeys(text2) {
 async function resolveCitations(text2) {
   const keys = extractCitationKeys(text2);
   if (keys.length === 0) return [];
-  const sources = await storage.getLegalSourcesByKeys(keys);
+  let sources = [];
+  try {
+    sources = await storage.getLegalSourcesByKeys(keys);
+  } catch (err) {
+    console.warn("[citations] legal_sources lookup failed \u2014 citations will be marked unverified. Run `npm run db:push` + `npm run seed` to enable.", err);
+    return keys.map((citationKey) => ({ citationKey, verified: false }));
+  }
   const byKey = new Map(sources.map((s) => [s.citationKey, s]));
   return keys.map((key) => {
     const source = byKey.get(key);
@@ -496,7 +512,12 @@ async function askClaude(question) {
   });
   const content = message.content[0];
   if (content.type !== "text") throw new Error("Unexpected response type from Claude");
-  const citations = await resolveCitations(content.text);
+  let citations = [];
+  try {
+    citations = await resolveCitations(content.text);
+  } catch (err) {
+    console.warn("[askClaude] citation resolution failed; returning answer without citations", err);
+  }
   return { text: content.text, citations };
 }
 async function analyzeBlueprintImage(base64Data, mediaType, originalName) {
@@ -1021,7 +1042,12 @@ async function registerRoutes(httpServer2, app2) {
       res.json({ question: saved });
     } catch (err) {
       if (err instanceof import_zod2.ZodError) return res.status(400).json({ error: err.errors[0].message });
-      console.error(err);
+      console.error("[/api/questions/ask] failed:", {
+        message: err?.message,
+        status: err?.status,
+        name: err?.name,
+        stack: err?.stack?.split("\n").slice(0, 5).join("\n")
+      });
       res.status(500).json({ error: "\u03A3\u03C6\u03AC\u03BB\u03BC\u03B1 \u03BA\u03B1\u03C4\u03AC \u03C4\u03B7\u03BD \u03B5\u03C0\u03B5\u03BE\u03B5\u03C1\u03B3\u03B1\u03C3\u03AF\u03B1 \u03C4\u03B7\u03C2 \u03B5\u03C1\u03CE\u03C4\u03B7\u03C3\u03B7\u03C2" });
     }
   });

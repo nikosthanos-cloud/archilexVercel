@@ -192,8 +192,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createQuestion(userId: string, question: string, answer: string, citations: ResolvedCitation[] | null = null): Promise<Question> {
-    const result = await db.insert(questions).values({ userId, question, answer, citations: citations ?? undefined }).returning();
-    return result[0];
+    try {
+      const result = await db.insert(questions).values({ userId, question, answer, citations: citations ?? undefined }).returning();
+      return result[0];
+    } catch (err: any) {
+      const msg = String(err?.message ?? err);
+      if (msg.includes("citations") && /does not exist|undefined column/i.test(msg)) {
+        console.warn("[storage] questions.citations column missing — falling back to legacy insert. Run `npm run db:push` to migrate.");
+        const result = await db.insert(questions).values({ userId, question, answer }).returning();
+        return result[0];
+      }
+      throw err;
+    }
   }
 
   async getUserQuestions(userId: string): Promise<Question[]> {

@@ -19,7 +19,14 @@ export async function resolveCitations(
   const keys = extractCitationKeys(text);
   if (keys.length === 0) return [];
 
-  const sources = await storage.getLegalSourcesByKeys(keys);
+  let sources: Awaited<ReturnType<typeof storage.getLegalSourcesByKeys>> = [];
+  try {
+    sources = await storage.getLegalSourcesByKeys(keys);
+  } catch (err) {
+    console.warn("[citations] legal_sources lookup failed — citations will be marked unverified. Run `npm run db:push` + `npm run seed` to enable.", err);
+    return keys.map<ResolvedCitation>((citationKey) => ({ citationKey, verified: false }));
+  }
+
   const byKey = new Map(sources.map((s) => [s.citationKey, s]));
 
   return keys.map<ResolvedCitation>((key) => {

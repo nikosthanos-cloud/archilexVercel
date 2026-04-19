@@ -235,9 +235,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { text, citations } = await askClaude(question);
       const saved = await storage.createQuestion(req.session.userId!, question, text, citations);
       res.json({ question: saved });
-    } catch (err) {
+    } catch (err: any) {
       if (err instanceof ZodError) return res.status(400).json({ error: err.errors[0].message });
-      console.error(err);
+      console.error("[/api/questions/ask] failed:", {
+        message: err?.message,
+        status: err?.status,
+        name: err?.name,
+        stack: err?.stack?.split("\n").slice(0, 5).join("\n"),
+      });
       res.status(500).json({ error: "Σφάλμα κατά την επεξεργασία της ερώτησης" });
     }
   });
