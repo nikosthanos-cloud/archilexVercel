@@ -1033,22 +1033,49 @@ async function registerRoutes(httpServer2, app2) {
     }
   });
   app2.post("/api/questions/ask", requireAuth, async (req, res) => {
+    let question;
     try {
-      const { question } = insertQuestionSchema.parse(req.body);
-      const canProceed = await checkAndIncrementUsage(req.session.userId, res);
-      if (!canProceed) return;
-      const { text: text2, citations } = await askClaude(question);
-      const saved = await storage.createQuestion(req.session.userId, question, text2, citations);
-      res.json({ question: saved });
+      ({ question } = insertQuestionSchema.parse(req.body));
     } catch (err) {
       if (err instanceof import_zod2.ZodError) return res.status(400).json({ error: err.errors[0].message });
-      console.error("[/api/questions/ask] failed:", {
+      return res.status(400).json({ error: "\u039C\u03B7 \u03AD\u03B3\u03BA\u03C5\u03C1\u03B7 \u03B5\u03C1\u03CE\u03C4\u03B7\u03C3\u03B7" });
+    }
+    const canProceed = await checkAndIncrementUsage(req.session.userId, res);
+    if (!canProceed) return;
+    let aiResult;
+    try {
+      aiResult = await askClaude(question);
+    } catch (err) {
+      console.error("[/api/questions/ask] AI call failed:", {
         message: err?.message,
         status: err?.status,
         name: err?.name,
         stack: err?.stack?.split("\n").slice(0, 5).join("\n")
       });
-      res.status(500).json({ error: "\u03A3\u03C6\u03AC\u03BB\u03BC\u03B1 \u03BA\u03B1\u03C4\u03AC \u03C4\u03B7\u03BD \u03B5\u03C0\u03B5\u03BE\u03B5\u03C1\u03B3\u03B1\u03C3\u03AF\u03B1 \u03C4\u03B7\u03C2 \u03B5\u03C1\u03CE\u03C4\u03B7\u03C3\u03B7\u03C2" });
+      const upstream = typeof err?.status === "number" && err.status >= 400 && err.status < 600 ? err.status : 502;
+      return res.status(upstream).json({
+        error: "\u039F AI \u03B2\u03BF\u03B7\u03B8\u03CC\u03C2 \u03B5\u03AF\u03BD\u03B1\u03B9 \u03C0\u03C1\u03BF\u03C3\u03C9\u03C1\u03B9\u03BD\u03AC \u03BC\u03B7 \u03B4\u03B9\u03B1\u03B8\u03AD\u03C3\u03B9\u03BC\u03BF\u03C2. \u03A0\u03B1\u03C1\u03B1\u03BA\u03B1\u03BB\u03CE \u03B4\u03BF\u03BA\u03B9\u03BC\u03AC\u03C3\u03C4\u03B5 \u03BE\u03B1\u03BD\u03AC \u03C3\u03B5 \u03BB\u03AF\u03B3\u03BF.",
+        detail: err?.message ?? err?.name ?? "unknown"
+      });
+    }
+    try {
+      const saved = await storage.createQuestion(req.session.userId, question, aiResult.text, aiResult.citations);
+      return res.json({ question: saved });
+    } catch (err) {
+      console.error("[/api/questions/ask] DB persistence failed; returning answer without saving:", {
+        message: err?.message,
+        code: err?.code
+      });
+      return res.json({
+        question: {
+          id: `ephemeral-${Date.now()}`,
+          userId: req.session.userId,
+          question,
+          answer: aiResult.text,
+          citations: aiResult.citations,
+          createdAt: (/* @__PURE__ */ new Date()).toISOString()
+        }
+      });
     }
   });
   app2.get("/api/questions/history", requireAuth, async (req, res) => {

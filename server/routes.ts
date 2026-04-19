@@ -228,22 +228,52 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // ── AI Questions ──────────────────────────────────────────────────────
   app.post("/api/questions/ask", requireAuth, async (req, res) => {
+    let question: string;
     try {
-      const { question } = insertQuestionSchema.parse(req.body);
-      const canProceed = await checkAndIncrementUsage(req.session.userId!, res);
-      if (!canProceed) return;
-      const { text, citations } = await askClaude(question);
-      const saved = await storage.createQuestion(req.session.userId!, question, text, citations);
-      res.json({ question: saved });
+      ({ question } = insertQuestionSchema.parse(req.body));
     } catch (err: any) {
       if (err instanceof ZodError) return res.status(400).json({ error: err.errors[0].message });
-      console.error("[/api/questions/ask] failed:", {
+      return res.status(400).json({ error: "Μη έγκυρη ερώτηση" });
+    }
+
+    const canProceed = await checkAndIncrementUsage(req.session.userId!, res);
+    if (!canProceed) return;
+
+    let aiResult: Awaited<ReturnType<typeof askClaude>>;
+    try {
+      aiResult = await askClaude(question);
+    } catch (err: any) {
+      console.error("[/api/questions/ask] AI call failed:", {
         message: err?.message,
         status: err?.status,
         name: err?.name,
         stack: err?.stack?.split("\n").slice(0, 5).join("\n"),
       });
-      res.status(500).json({ error: "Σφάλμα κατά την επεξεργασία της ερώτησης" });
+      const upstream = typeof err?.status === "number" && err.status >= 400 && err.status < 600 ? err.status : 502;
+      return res.status(upstream).json({
+        error: "Ο AI βοηθός είναι προσωρινά μη διαθέσιμος. Παρακαλώ δοκιμάστε ξανά σε λίγο.",
+        detail: err?.message ?? err?.name ?? "unknown",
+      });
+    }
+
+    try {
+      const saved = await storage.createQuestion(req.session.userId!, question, aiResult.text, aiResult.citations);
+      return res.json({ question: saved });
+    } catch (err: any) {
+      console.error("[/api/questions/ask] DB persistence failed; returning answer without saving:", {
+        message: err?.message,
+        code: err?.code,
+      });
+      return res.json({
+        question: {
+          id: `ephemeral-${Date.now()}`,
+          userId: req.session.userId,
+          question,
+          answer: aiResult.text,
+          citations: aiResult.citations,
+          createdAt: new Date().toISOString(),
+        },
+      });
     }
   });
 
