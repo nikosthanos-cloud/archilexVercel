@@ -3,11 +3,20 @@ import { db } from "../server/db";
 import { users } from "../shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { LEGAL_SOURCES_SEED } from "../server/data/legal-sources-seed";
 
 async function seed() {
     console.log("🌱 Seeding database...");
 
     try {
+        // 0. Seed Legal Sources Registry
+        let inserted = 0;
+        for (const source of LEGAL_SOURCES_SEED) {
+            await storage.upsertLegalSource(source);
+            inserted++;
+        }
+        console.log(`✅ Legal sources registry: ${inserted} entries seeded/updated`);
+
         // 1. Create Demo User
         const demoPassword = await bcrypt.hash("demo1234", 12);
         const demoUser = await storage.createUser({

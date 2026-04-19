@@ -30,11 +30,14 @@ import TeeCalculator from "./TeeCalculator";
 import Projects from "./Projects";
 import TechnicalReports from "./TechnicalReports";
 import ProfileSettings from "./ProfileSettings";
+import { renderWithCitations } from "@/lib/renderWithCitations";
+import type { ResolvedCitation } from "@shared/schema";
 
 interface Question {
   id: string;
   question: string;
   answer: string;
+  citations?: ResolvedCitation[] | null;
   createdAt: string;
 }
 
@@ -126,7 +129,7 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const [question, setQuestion] = useState("");
   const [activeView, setActiveView] = useState<View>("chat");
-  const [currentMessages, setCurrentMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
+  const [currentMessages, setCurrentMessages] = useState<{ role: "user" | "ai"; text: string; citations?: ResolvedCitation[] | null }[]>([]);
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -142,7 +145,7 @@ export default function Dashboard() {
       return data.question as Question;
     },
     onSuccess: (q) => {
-      setCurrentMessages((prev) => [...prev, { role: "ai", text: q.answer }]);
+      setCurrentMessages((prev) => [...prev, { role: "ai", text: q.answer, citations: q.citations }]);
       queryClient.invalidateQueries({ queryKey: ["/api/questions/history"] });
       refreshUser();
     },
@@ -393,7 +396,11 @@ export default function Dashboard() {
                             </div>
                           </div>
                         ) : (
-                          <p className="whitespace-pre-wrap">{msg.text}</p>
+                          <p className="whitespace-pre-wrap">
+                            {msg.role === "ai"
+                              ? renderWithCitations(msg.text, msg.citations)
+                              : msg.text}
+                          </p>
                         )}
                       </div>
                       {msg.role === "user" && (
@@ -548,7 +555,9 @@ export default function Dashboard() {
                           <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
                             <Building2 className="w-3.5 h-3.5 text-primary" />
                           </div>
-                          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{q.answer}</p>
+                          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                            {renderWithCitations(q.answer, q.citations)}
+                          </p>
                         </div>
                       </CardContent>
                     </Card>
