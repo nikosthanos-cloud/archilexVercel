@@ -43,8 +43,34 @@ export const questions = pgTable("questions", {
   userId: varchar("user_id").notNull().references(() => users.id),
   question: text("question").notNull(),
   answer: text("answer").notNull(),
+  citations: json("citations").$type<ResolvedCitation[]>(),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
 });
+
+export const legalSources = pgTable("legal_sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  citationKey: text("citation_key").notNull().unique(),
+  sourceType: text("source_type").notNull(),
+  title: text("title").notNull(),
+  lawNumber: text("law_number"),
+  article: text("article"),
+  paragraph: text("paragraph"),
+  fullText: text("full_text").notNull(),
+  summary: text("summary").notNull(),
+  officialUrl: text("official_url"),
+  fekReference: text("fek_reference"),
+  lastVerifiedAt: timestamp("last_verified_at").notNull().default(sql`now()`),
+  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+});
+
+export type ResolvedCitation = {
+  citationKey: string;
+  verified: boolean;
+  title?: string;
+  summary?: string;
+  officialUrl?: string;
+  fekReference?: string;
+};
 
 export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
@@ -152,4 +178,5 @@ export type ProjectNote = typeof projectNotes.$inferSelect;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type Session = typeof session.$inferSelect;
+export type LegalSource = typeof legalSources.$inferSelect;
 

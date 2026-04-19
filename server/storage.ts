@@ -1,11 +1,11 @@
 import { db } from "./db";
 import {
-  users, questions, uploads, projects, projectNotes, passwordResetTokens, payments,
+  users, questions, uploads, projects, projectNotes, passwordResetTokens, payments, legalSources,
   type User, type InsertUser, type UpdateProfile, type Question, type Upload,
   type Project, type InsertProject, type ProjectNote, type PasswordResetToken,
-  type Payment,
+  type Payment, type LegalSource, type ResolvedCitation,
 } from "@shared/schema";
-import { eq, desc, gte, lt, count, sum } from "drizzle-orm";
+import { eq, desc, gte, lt, count, sum, inArray } from "drizzle-orm";
 
 export interface AdminStats {
   totalUsers: number;
@@ -31,8 +31,11 @@ export interface IStorage {
   getAdminStats(): Promise<AdminStats>;
   incrementUsageCount(id: string): Promise<User>;
   resetMonthlyUsage(id: string): Promise<User>;
-  createQuestion(userId: string, question: string, answer: string): Promise<Question>;
+  createQuestion(userId: string, question: string, answer: string, citations?: ResolvedCitation[] | null): Promise<Question>;
   getUserQuestions(userId: string): Promise<Question[]>;
+  getLegalSourceByKey(citationKey: string): Promise<LegalSource | undefined>;
+  getLegalSourcesByKeys(citationKeys: string[]): Promise<LegalSource[]>;
+  upsertLegalSource(source: Omit<LegalSource, "id" | "createdAt" | "lastVerifiedAt">): Promise<LegalSource>;
   createPayment(data: { userId: string; stripePaymentId: string; plan: string; amount: number; status: string }): Promise<Payment>;
   getAllPayments(): Promise<Payment[]>;
   createUpload(userId: string, filename: string, fileType: string, analysis: string): Promise<Upload>;
@@ -188,13 +191,36 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async createQuestion(userId: string, question: string, answer: string): Promise<Question> {
-    const result = await db.insert(questions).values({ userId, question, answer }).returning();
+  async createQuestion(userId: string, question: string, answer: string, citations: ResolvedCitation[] | null = null): Promise<Question> {
+    const result = await db.insert(questions).values({ userId, question, answer, citations: citations ?? undefined }).returning();
     return result[0];
   }
 
   async getUserQuestions(userId: string): Promise<Question[]> {
     return await db.select().from(questions).where(eq(questions.userId, userId)).orderBy(desc(questions.createdAt));
+  }
+
+  async getLegalSourceByKey(citationKey: string): Promise<LegalSource | undefined> {
+    const result = await db.select().from(legalSources).where(eq(legalSources.citationKey, citationKey)).limit(1);
+    return result[0];
+  }
+
+  async getLegalSourcesByKeys(citationKeys: string[]): Promise<LegalSource[]> {
+    if (citationKeys.length === 0) return [];
+    return await db.select().from(legalSources).where(inArray(legalSources.citationKey, citationKeys));
+  }
+
+  async upsertLegalSource(source: Omit<LegalSource, "id" | "createdAt" | "lastVerifiedAt">): Promise<LegalSource> {
+    const existing = await this.getLegalSourceByKey(source.citationKey);
+    if (existing) {
+      const result = await db.update(legalSources)
+        .set({ ...source, lastVerifiedAt: new Date() })
+        .where(eq(legalSources.id, existing.id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(legalSources).values(source).returning();
+    return result[0];
   }
 
   async createUpload(userId: string, filename: string, fileType: string, analysis: string): Promise<Upload> {

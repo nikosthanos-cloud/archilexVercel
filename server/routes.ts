@@ -232,8 +232,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { question } = insertQuestionSchema.parse(req.body);
       const canProceed = await checkAndIncrementUsage(req.session.userId!, res);
       if (!canProceed) return;
-      const answer = await askClaude(question);
-      const saved = await storage.createQuestion(req.session.userId!, question, answer);
+      const { text, citations } = await askClaude(question);
+      const saved = await storage.createQuestion(req.session.userId!, question, text, citations);
       res.json({ question: saved });
     } catch (err) {
       if (err instanceof ZodError) return res.status(400).json({ error: err.errors[0].message });
@@ -245,6 +245,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/questions/history", requireAuth, async (req, res) => {
     const userQuestions = await storage.getUserQuestions(req.session.userId!);
     res.json({ questions: userQuestions });
+  });
+
+  app.get("/api/citations/:key", requireAuth, async (req, res) => {
+    const key = decodeURIComponent(String(req.params.key));
+    const source = await storage.getLegalSourceByKey(key);
+    if (!source) return res.status(404).json({ error: "Η αναφορά δεν βρέθηκε στο μητρώο" });
+    res.json({ source });
   });
 
   // ── Usage increment for client-side tools (TEE, Cost Estimator) ──────
