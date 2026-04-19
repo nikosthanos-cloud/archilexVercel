@@ -2,10 +2,15 @@ import Anthropic from "@anthropic-ai/sdk";
 import { resolveCitations } from "./citations";
 import type { ResolvedCitation } from "@shared/schema";
 
+const useGateway = !!process.env.AI_GATEWAY_API_KEY;
+
 const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+  apiKey: process.env.AI_GATEWAY_API_KEY || process.env.ANTHROPIC_API_KEY,
+  ...(useGateway && { baseURL: "https://ai-gateway.vercel.sh" }),
 });
-const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+
+const HAIKU_MODEL = useGateway ? "anthropic/claude-haiku-4.5" : "claude-haiku-4-5-20251001";
+const SONNET_MODEL = useGateway ? "anthropic/claude-sonnet-4.6" : "claude-sonnet-4-6";
 
 const CITATION_RULES = `ΚΑΝΟΝΕΣ ΠΑΡΑΠΟΜΠΩΝ (υποχρεωτικοί):
 Κάθε φορά που αναφέρεσαι σε συγκεκριμένη νομική διάταξη, ΠΡΕΠΕΙ να παραθέτεις inline marker αμέσως μετά τη δήλωση, χρησιμοποιώντας ένα από τα παρακάτω formats:
@@ -64,7 +69,7 @@ export async function askClaude(
   question: string
 ): Promise<{ text: string; citations: ResolvedCitation[] }> {
   const message = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
+    model: HAIKU_MODEL,
     max_tokens: 1500,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: question }],
@@ -83,7 +88,7 @@ export async function analyzeBlueprintImage(
   originalName: string
 ): Promise<string> {
   const message = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
+    model: SONNET_MODEL,
     max_tokens: 2000,
     system: BLUEPRINT_SYSTEM_PROMPT,
     messages: [
@@ -117,7 +122,7 @@ export async function analyzeBlueprintPDF(
   originalName: string
 ): Promise<string> {
   const message = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
+    model: SONNET_MODEL,
     max_tokens: 2000,
     system: BLUEPRINT_SYSTEM_PROMPT,
     messages: [
@@ -231,7 +236,7 @@ ${params.specialNotes ? `Ειδικές σημειώσεις / πρόσθετα 
 Συντάξτε πλήρη, επίσημη τεχνική έκθεση με αριθμημένες παραγράφους, επαγγελματική ορολογία και παραπομπές στη σχετική νομοθεσία.`;
 
   const message = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
+    model: HAIKU_MODEL,
     max_tokens: 3500,
     system: TECHNICAL_REPORT_SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],
@@ -270,7 +275,7 @@ export async function generatePermitChecklist(projectDetails: {
 Παρέχε πλήρη και οργανωμένο κατάλογο εγγράφων που απαιτούνται.`;
 
   const message = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
+    model: HAIKU_MODEL,
     max_tokens: 2000,
     system: CHECKLIST_SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }],

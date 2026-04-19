@@ -431,10 +431,13 @@ async function resolveCitations(text2) {
 }
 
 // server/anthropic.ts
+var useGateway = !!process.env.AI_GATEWAY_API_KEY;
 var anthropic = new import_sdk.default({
-  apiKey: process.env.ANTHROPIC_API_KEY
+  apiKey: process.env.AI_GATEWAY_API_KEY || process.env.ANTHROPIC_API_KEY,
+  ...useGateway && { baseURL: "https://ai-gateway.vercel.sh" }
 });
-var ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+var HAIKU_MODEL = useGateway ? "anthropic/claude-haiku-4.5" : "claude-haiku-4-5-20251001";
+var SONNET_MODEL = useGateway ? "anthropic/claude-sonnet-4.6" : "claude-sonnet-4-6";
 var CITATION_RULES = `\u039A\u0391\u039D\u039F\u039D\u0395\u03A3 \u03A0\u0391\u03A1\u0391\u03A0\u039F\u039C\u03A0\u03A9\u039D (\u03C5\u03C0\u03BF\u03C7\u03C1\u03B5\u03C9\u03C4\u03B9\u03BA\u03BF\u03AF):
 \u039A\u03AC\u03B8\u03B5 \u03C6\u03BF\u03C1\u03AC \u03C0\u03BF\u03C5 \u03B1\u03BD\u03B1\u03C6\u03AD\u03C1\u03B5\u03C3\u03B1\u03B9 \u03C3\u03B5 \u03C3\u03C5\u03B3\u03BA\u03B5\u03BA\u03C1\u03B9\u03BC\u03AD\u03BD\u03B7 \u03BD\u03BF\u03BC\u03B9\u03BA\u03AE \u03B4\u03B9\u03AC\u03C4\u03B1\u03BE\u03B7, \u03A0\u03A1\u0395\u03A0\u0395\u0399 \u03BD\u03B1 \u03C0\u03B1\u03C1\u03B1\u03B8\u03AD\u03C4\u03B5\u03B9\u03C2 inline marker \u03B1\u03BC\u03AD\u03C3\u03C9\u03C2 \u03BC\u03B5\u03C4\u03AC \u03C4\u03B7 \u03B4\u03AE\u03BB\u03C9\u03C3\u03B7, \u03C7\u03C1\u03B7\u03C3\u03B9\u03BC\u03BF\u03C0\u03BF\u03B9\u03CE\u03BD\u03C4\u03B1\u03C2 \u03AD\u03BD\u03B1 \u03B1\u03C0\u03CC \u03C4\u03B1 \u03C0\u03B1\u03C1\u03B1\u03BA\u03AC\u03C4\u03C9 formats:
 - [\u039D.XXXX/YYYY-\u0391\u03C1.Z]  \u2014 \u03C0.\u03C7. [\u039D.4495/2017-\u0391\u03C1.96]
@@ -486,7 +489,7 @@ var CHECKLIST_SYSTEM_PROMPT = `\u0395\u03AF\u03C3\u03B1\u03B9 \u03B5\u03BE\u03B5
 \u0391\u03C0\u03B1\u03BD\u03C4\u03AC\u03C2 \u039C\u039F\u039D\u039F \u03C3\u03C4\u03B1 \u0395\u03BB\u03BB\u03B7\u03BD\u03B9\u03BA\u03AC, \u03C7\u03C1\u03B7\u03C3\u03B9\u03BC\u03BF\u03C0\u03BF\u03B9\u03CE\u03BD\u03C4\u03B1\u03C2 bullet points \u03BA\u03B1\u03B9 \u03C3\u03B1\u03C6\u03AE \u03B4\u03BF\u03BC\u03AE.`;
 async function askClaude(question) {
   const message = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
+    model: HAIKU_MODEL,
     max_tokens: 1500,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: question }]
@@ -498,7 +501,7 @@ async function askClaude(question) {
 }
 async function analyzeBlueprintImage(base64Data, mediaType, originalName) {
   const message = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
+    model: SONNET_MODEL,
     max_tokens: 2e3,
     system: BLUEPRINT_SYSTEM_PROMPT,
     messages: [
@@ -527,7 +530,7 @@ async function analyzeBlueprintImage(base64Data, mediaType, originalName) {
 }
 async function analyzeBlueprintPDF(base64Data, originalName) {
   const message = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
+    model: SONNET_MODEL,
     max_tokens: 2e3,
     system: BLUEPRINT_SYSTEM_PROMPT,
     messages: [
@@ -623,7 +626,7 @@ ${params.specialNotes ? `\u0395\u03B9\u03B4\u03B9\u03BA\u03AD\u03C2 \u03C3\u03B7
 
 \u03A3\u03C5\u03BD\u03C4\u03AC\u03BE\u03C4\u03B5 \u03C0\u03BB\u03AE\u03C1\u03B7, \u03B5\u03C0\u03AF\u03C3\u03B7\u03BC\u03B7 \u03C4\u03B5\u03C7\u03BD\u03B9\u03BA\u03AE \u03AD\u03BA\u03B8\u03B5\u03C3\u03B7 \u03BC\u03B5 \u03B1\u03C1\u03B9\u03B8\u03BC\u03B7\u03BC\u03AD\u03BD\u03B5\u03C2 \u03C0\u03B1\u03C1\u03B1\u03B3\u03C1\u03AC\u03C6\u03BF\u03C5\u03C2, \u03B5\u03C0\u03B1\u03B3\u03B3\u03B5\u03BB\u03BC\u03B1\u03C4\u03B9\u03BA\u03AE \u03BF\u03C1\u03BF\u03BB\u03BF\u03B3\u03AF\u03B1 \u03BA\u03B1\u03B9 \u03C0\u03B1\u03C1\u03B1\u03C0\u03BF\u03BC\u03C0\u03AD\u03C2 \u03C3\u03C4\u03B7 \u03C3\u03C7\u03B5\u03C4\u03B9\u03BA\u03AE \u03BD\u03BF\u03BC\u03BF\u03B8\u03B5\u03C3\u03AF\u03B1.`;
   const message = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
+    model: HAIKU_MODEL,
     max_tokens: 3500,
     system: TECHNICAL_REPORT_SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }]
@@ -648,7 +651,7 @@ async function generatePermitChecklist(projectDetails) {
 
 \u03A0\u03B1\u03C1\u03AD\u03C7\u03B5 \u03C0\u03BB\u03AE\u03C1\u03B7 \u03BA\u03B1\u03B9 \u03BF\u03C1\u03B3\u03B1\u03BD\u03C9\u03BC\u03AD\u03BD\u03BF \u03BA\u03B1\u03C4\u03AC\u03BB\u03BF\u03B3\u03BF \u03B5\u03B3\u03B3\u03C1\u03AC\u03C6\u03C9\u03BD \u03C0\u03BF\u03C5 \u03B1\u03C0\u03B1\u03B9\u03C4\u03BF\u03CD\u03BD\u03C4\u03B1\u03B9.`;
   const message = await anthropic.messages.create({
-    model: ANTHROPIC_MODEL,
+    model: HAIKU_MODEL,
     max_tokens: 2e3,
     system: CHECKLIST_SYSTEM_PROMPT,
     messages: [{ role: "user", content: prompt }]
