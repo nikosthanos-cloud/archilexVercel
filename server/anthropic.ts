@@ -78,7 +78,12 @@ export async function askClaude(
   const content = message.content[0];
   if (content.type !== "text") throw new Error("Unexpected response type from Claude");
 
-  const citations = await resolveCitations(content.text);
+  let citations: ResolvedCitation[] = [];
+  try {
+    citations = await resolveCitations(content.text);
+  } catch (err) {
+    console.warn("[askClaude] citation resolution failed; returning answer without citations", err);
+  }
   return { text: content.text, citations };
 }
 
